@@ -2,7 +2,7 @@
 
 A macOS-only VLC Lua interface that applies the Finder tag `last-seen` to the local media file currently opened in VLC.
 
-For each folder, it keeps at most one file tagged `last-seen`. Opening another file from the same folder moves the tag while preserving every unrelated Finder tag.
+For each folder, it keeps at most one file tagged `last-seen`. Opening another file from the same folder moves the tag while preserving every unrelated Finder tag and its color. The `last-seen` tag is blue by default, so Finder renders a visible colored dot next to the file.
 
 ## Requirements
 
@@ -13,6 +13,8 @@ For each folder, it keeps at most one file tagged `last-seen`. Opening another f
 ## Compatibility
 
 Tested with VLC 3.x on macOS. The Lua source includes a current-item fallback for newer VLC APIs, but VLC 4 compatibility has not yet been verified.
+
+Colored custom tags require writing Finder's tag metadata representation directly because Foundation exposes tag names but not a writable per-tag color. That representation is macOS-specific and may require adjustment in a future macOS release.
 
 ## Install
 
@@ -64,7 +66,7 @@ The installer:
 
 The scoped interface entry allows VLC Last Seen to coexist with other extra interfaces, including other Lua interfaces.
 
-At runtime, the Lua interface watches VLC's current local input. When the input changes, it invokes the macOS-provided `osascript` executable and uses Foundation's URL resource APIs to update Finder tags. It does not contact the network at runtime.
+At runtime, the Lua interface watches VLC's current local input. When the input changes, it invokes the macOS-provided `osascript` executable, reads Finder's raw tag metadata, and writes the `last-seen` tag with a color index while preserving every unrelated tag and color. It does not contact the network at runtime.
 
 ## Behavior
 
@@ -87,6 +89,29 @@ Show/
 Only the `last-seen` tag is moved. Other tags are preserved.
 
 Network streams and other non-file VLC inputs are ignored.
+
+
+## Tag color
+
+`last-seen` is blue by default. To use another Finder color, edit `TAG_COLOR` near the top of `src/last-seen.lua` before installing:
+
+```lua
+local TAG_COLOR = 4
+```
+
+Finder's colored tag indexes are:
+
+| Value | Color |
+|---:|---|
+| `1` | Gray |
+| `2` | Green |
+| `3` | Purple |
+| `4` | Blue |
+| `5` | Yellow |
+| `6` | Red |
+| `7` | Orange |
+
+After changing it, rerun the installer to update the installed interface.
 
 ## Configuration backups
 
