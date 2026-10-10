@@ -2,7 +2,9 @@
 
 A macOS-only VLC Lua interface that applies the Finder tag `last-seen` to the local media file currently opened in VLC.
 
-For each folder, it keeps at most one file tagged `last-seen`. Opening another file from the same folder moves the tag while preserving every unrelated Finder tag and its color. The `last-seen` tag is blue by default, so Finder renders a visible colored dot next to the file.
+For each folder, it keeps at most one file tagged `last-seen`. Opening another file from the same folder moves the tag while preserving every unrelated Finder tag and its color.
+
+It also records how far you got in each file as a Finder comment, such as `47%`, so you can tell an interrupted episode from one you stopped during the credits.
 
 ## Requirements
 
@@ -14,7 +16,7 @@ For each folder, it keeps at most one file tagged `last-seen`. Opening another f
 
 Tested with VLC 3.x on macOS. The Lua source includes a current-item fallback for newer VLC APIs, but VLC 4 compatibility has not yet been verified.
 
-Colored custom tags require writing Finder's tag metadata representation directly because Foundation exposes tag names but not a writable per-tag color. That representation is macOS-specific and may require adjustment in a future macOS release.
+Watch progress is written through Finder scripting, so macOS asks once whether VLC may control Finder. See [Watch progress](#watch-progress).
 
 ## Install
 
@@ -32,7 +34,7 @@ Rerun the same command to update the installed Lua interface.
 curl -fsSL https://raw.githubusercontent.com/Carlos-err406/vlc-last-seen/main/uninstall.sh | /bin/bash
 ```
 
-Uninstalling removes the interface and its VLC startup configuration. Existing `last-seen` Finder tags are not removed from media files.
+Uninstalling removes the interface and its VLC startup configuration. Existing `last-seen` Finder tags and progress comments are not removed from media files.
 
 ## Local installation
 
@@ -66,7 +68,7 @@ The installer:
 
 The scoped interface entry allows VLC Last Seen to coexist with other extra interfaces, including other Lua interfaces.
 
-At runtime, the Lua interface watches VLC's current local input. When the input changes, it invokes the macOS-provided `osascript` executable, reads Finder's raw tag metadata, and writes the `last-seen` tag with a color index while preserving every unrelated tag and color. It does not contact the network at runtime.
+At runtime, the Lua interface watches VLC's current local input. When the input changes, it invokes the macOS-provided `osascript` executable to move the `last-seen` tag while preserving every unrelated tag. While the file plays, it samples the playback position and asks Finder to update the file's progress comment. It does not contact the network at runtime.
 
 ## Behavior
 
@@ -90,28 +92,35 @@ Only the `last-seen` tag is moved. Other tags are preserved.
 
 Network streams and other non-file VLC inputs are ignored.
 
+## Watch progress
+
+Each file you play gets its watch progress as the first line of its Finder comment:
+
+```text
+47%
+```
+
+A file at 97% was most likely stopped during the credits; one at 22% was interrupted. Progress is kept per file, so it stays after the `last-seen` tag moves on and you can see which episodes you finished.
+
+To see it in Finder, switch the folder to list view, open **View → Show View Options**, and enable **Comments**. It also appears under **Get Info**.
+
+Only a line consisting of a percentage (such as `47%`) is managed. Any other comment text you wrote is preserved below it.
+
+The comment is updated:
+
+- when you pause
+- when you switch to another file or playback ends
+- when you quit VLC
+- every 30 seconds while playing, if the percentage changed, so a crash or force quit loses at most that much
+
+Positions under 1% never overwrite an existing comment, so opening a file and closing it right away keeps its previous progress.
+
+The first time a comment is written, macOS asks whether VLC may control Finder. If you decline, tagging keeps working and progress comments are turned off. To enable them later, allow VLC to control Finder in **System Settings → Privacy & Security → Automation**, then restart VLC.
+
 
 ## Tag color
 
-`last-seen` is blue by default. To use another Finder color, edit `TAG_COLOR` near the top of `src/last-seen.lua` before installing:
-
-```lua
-local TAG_COLOR = 4
-```
-
-Finder's colored tag indexes are:
-
-| Value | Color |
-|---:|---|
-| `1` | Gray |
-| `2` | Green |
-| `3` | Purple |
-| `4` | Blue |
-| `5` | Yellow |
-| `6` | Red |
-| `7` | Orange |
-
-After changing it, rerun the installer to update the installed interface.
+VLC Last Seen sets only the tag name. Finder takes the color from its own tag settings. To give `last-seen` a color, right-click it under **Tags** in the Finder sidebar, or in **Finder → Settings → Tags**, and pick one. The color applies to every file with that tag.
 
 ## Configuration backups
 
